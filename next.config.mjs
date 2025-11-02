@@ -6,6 +6,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Mark sweph as external - tells Next.js/Turbopack not to bundle it
+  // Since it's a native Node.js module with C/C++ bindings, it should be external
+  serverComponentsExternalPackages: ['sweph'],
   // Turbopack config (required for Next.js 16+)
   turbopack: {},
   // Webpack config for native modules (sweph)
