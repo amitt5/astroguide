@@ -57,7 +57,9 @@ export async function sendWhatsAppMessage(to: string, body: string): Promise<str
     })
 
     if (!response.ok) {
-      throw new Error(`Twilio API error: ${response.statusText}`)
+      const errorText = await response.text()
+      console.error("[Twilio] API error response:", errorText)
+      throw new Error(`Twilio API error: ${response.status} ${response.statusText} - ${errorText}`)
     }
 
     const data = (await response.json()) as { sid: string }

@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       if (user) {
         // User already exists
         const message = "You're already registered! Send me your questions and I'll provide personalized astrological guidance. ✨"
-        await sendWhatsAppMessage(from, message)
+        await sendWhatsAppMessage(phoneNumber, message)
         return NextResponse.json({ success: true, message: "User already registered" })
       }
 
@@ -135,13 +135,13 @@ export async function POST(request: NextRequest) {
           `• "What about my career?"\n\n` +
           `Ask me anything! 🌟`
 
-        await sendWhatsAppMessage(from, successMessage)
+        await sendWhatsAppMessage(phoneNumber, successMessage)
         console.log("[WhatsApp] User registered successfully:", phoneNumber)
         return NextResponse.json({ success: true, message: "User registered", userId: user.id })
       } catch (error) {
         console.error("[WhatsApp] Registration error:", error)
         const errorMessage = "Sorry, there was an error during registration. Please try again with the correct format:\n\nREGISTER\nName: [Your Name]\nDate: YYYY-MM-DD\nTime: HH:MM\nLocation: [City, Country]"
-        await sendWhatsAppMessage(from, errorMessage)
+        await sendWhatsAppMessage(phoneNumber, errorMessage)
         return NextResponse.json({ success: false, error: "Registration failed" }, { status: 500 })
       }
     }
@@ -156,7 +156,8 @@ export async function POST(request: NextRequest) {
         "REGISTER\nName: John Doe\nDate: 1990-05-15\nTime: 14:30\nLocation: New York, USA"
 
       try {
-        await sendWhatsAppMessage(from, registrationMessage)
+        // Use extracted phoneNumber (without whatsapp: prefix) - sendWhatsAppMessage will add it
+        await sendWhatsAppMessage(phoneNumber, registrationMessage)
         console.log("[WhatsApp] Sent registration prompt to:", phoneNumber)
       } catch (error) {
         console.error("[WhatsApp] Failed to send registration prompt:", error)
@@ -219,10 +220,14 @@ export async function POST(request: NextRequest) {
 
     // Send response back via WhatsApp
     try {
-      await sendWhatsAppMessage(from, astrologicalResponse)
+      await sendWhatsAppMessage(phoneNumber, astrologicalResponse)
       console.log("[WhatsApp] Message sent successfully to:", phoneNumber)
     } catch (error) {
       console.error("[WhatsApp] Failed to send WhatsApp message:", error)
+      // Log more details about the error
+      if (error instanceof Error) {
+        console.error("[WhatsApp] Error details:", error.message)
+      }
     }
 
     return NextResponse.json({ success: true, userId: user.id })
