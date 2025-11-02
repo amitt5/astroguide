@@ -1,6 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { generateAstrologicalResponse } from "@/lib/astrological-engine"
+import {
+  generateAstrologicalResponse,
+  generateDailyHoroscope,
+  processUserIntent,
+  type AstrologicalContext,
+  type UserIntent,
+} from "@/lib/openai-service"
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,24 +41,43 @@ export async function POST(request: NextRequest) {
     // Get user's natal chart (if available)
     const natalChart = await db.getNatalChartByUser(user.id)
 
-    // Determine message type
+    // Process user intent using OpenAI
+    const intentClassification = await processUserIntent(message)
+    const intent = intentClassification.intent
+
+    // Map intent to message type for database storage
     let messageType: "question" | "horoscope" | "guidance" = "question"
-    if (message.toLowerCase().includes("horoscope")) {
+    if (intent === "horoscope") {
       messageType = "horoscope"
-    } else if (message.toLowerCase().includes("guidance") || message.toLowerCase().includes("advice")) {
+    } else if (
+      intent === "investment_advice" ||
+      intent === "relationship" ||
+      intent === "career" ||
+      intent === "health" ||
+      intent === "general_guidance"
+    ) {
       messageType = "guidance"
     }
 
-    // Generate astrological response
-    // Use natal chart data if available, otherwise use basic zodiac sign
-    const astrologicalResponse = await generateAstrologicalResponse(
-      {
+    // Generate astrological response based on intent
+    let astrologicalResponse: string
+
+    if (intent === "horoscope") {
+      // Generate daily horoscope
+      astrologicalResponse = await generateDailyHoroscope(user.zodiacSign)
+    } else {
+      // Generate personalized response using OpenAI
+      const context: AstrologicalContext = {
         sunSign: user.zodiacSign,
         moonSign: natalChart?.moonSign || "Unknown",
         ascendant: natalChart?.ascendant || "Unknown",
-      },
-      message,
-    )
+        birthDate: user.birthDate,
+        birthTime: user.birthTime,
+        birthLocation: user.birthLocation,
+      }
+
+      astrologicalResponse = await generateAstrologicalResponse(context, message, intent)
+    }
 
     // Save conversation with source tracking
     const conversation = await db.createConversation({
@@ -67,6 +92,7 @@ export async function POST(request: NextRequest) {
       success: true,
       response: astrologicalResponse,
       conversation,
+      intent: intent,
     })
   } catch (error) {
     console.error("[v0] Messages API error:", error)
