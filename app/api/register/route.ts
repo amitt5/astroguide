@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { getZodiacSign } from "@/lib/astrological-engine"
+import { calculateNatalChart, chartToNatalChart } from "@/lib/natal-chart-service"
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,6 +50,26 @@ export async function POST(request: NextRequest) {
       birthLocation: birthLocation.trim(),
       zodiacSign,
     })
+
+    // Calculate and save natal chart
+    try {
+      const calculatedChart = await calculateNatalChart({
+        birthDate,
+        birthTime,
+        birthLocation: birthLocation.trim(),
+      })
+
+      if (calculatedChart) {
+        const natalChartData = chartToNatalChart(user.id, calculatedChart)
+        await db.createNatalChart(natalChartData)
+        console.log(`[Registration] Natal chart calculated for user ${user.id}`)
+      } else {
+        console.warn(`[Registration] Could not calculate natal chart for user ${user.id}`)
+      }
+    } catch (chartError) {
+      // Don't fail registration if chart calculation fails
+      console.error("[Registration] Error calculating natal chart:", chartError)
+    }
 
     return NextResponse.json({
       success: true,
