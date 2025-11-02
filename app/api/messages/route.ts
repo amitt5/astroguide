@@ -24,9 +24,9 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json(
         {
-          error:
-            "User not found. Please ensure you have registered with this phone number. If this is your first time, please provide your birth details to create an account.",
+          error: "User not found. Please complete registration first.",
           success: false,
+          needsRegistration: true,
         },
         { status: 404 },
       )

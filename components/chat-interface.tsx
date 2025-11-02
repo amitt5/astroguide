@@ -17,10 +17,20 @@ interface Message {
 export function ChatInterface() {
   const [phoneNumber, setPhoneNumber] = useState("")
   const [phoneSubmitted, setPhoneSubmitted] = useState(false)
+  const [showRegistration, setShowRegistration] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Registration form state
+  const [registrationData, setRegistrationData] = useState({
+    name: "",
+    birthDate: "",
+    birthTime: "",
+    birthLocation: "",
+  })
+  const [registering, setRegistering] = useState(false)
 
   // Load phone number from localStorage on mount
   useEffect(() => {
@@ -45,6 +55,71 @@ export function ChatInterface() {
       // Store phone number in localStorage
       localStorage.setItem("astroguide_phone", phoneNumber.trim())
       setPhoneSubmitted(true)
+    }
+  }
+
+  const handleRegistrationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setRegistering(true)
+
+    try {
+      const response = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phoneNumber: phoneNumber.trim(),
+          name: registrationData.name.trim(),
+          birthDate: registrationData.birthDate,
+          birthTime: registrationData.birthTime,
+          birthLocation: registrationData.birthLocation.trim(),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Registration successful - hide registration form
+        setShowRegistration(false)
+        setMessages([
+          ...messages,
+          {
+            id: `registration-${Date.now()}`,
+            userMessage: "",
+            assistantResponse: `Welcome ${data.user.name}! Your account has been created. Your zodiac sign is ${data.user.zodiacSign}. How can I help you today?`,
+            timestamp: new Date().toISOString(),
+          },
+        ])
+        // Clear registration form
+        setRegistrationData({
+          name: "",
+          birthDate: "",
+          birthTime: "",
+          birthLocation: "",
+        })
+      } else {
+        setMessages([
+          ...messages,
+          {
+            id: `error-${Date.now()}`,
+            userMessage: "",
+            assistantResponse: data.error || "Registration failed. Please try again.",
+            timestamp: new Date().toISOString(),
+          },
+        ])
+      }
+    } catch (error) {
+      console.error("[v0] Registration error:", error)
+      setMessages([
+        ...messages,
+        {
+          id: `error-${Date.now()}`,
+          userMessage: "",
+          assistantResponse: "Sorry, there was an error during registration. Please try again.",
+          timestamp: new Date().toISOString(),
+        },
+      ])
+    } finally {
+      setRegistering(false)
     }
   }
 
@@ -77,6 +152,18 @@ export function ChatInterface() {
             id: data.conversation.id,
             userMessage: userMessage,
             assistantResponse: data.response,
+            timestamp: new Date().toISOString(),
+          },
+        ])
+      } else if (data.needsRegistration) {
+        // User not found - show registration form
+        setShowRegistration(true)
+        setMessages([
+          ...messages,
+          {
+            id: `info-${Date.now()}`,
+            userMessage: userMessage,
+            assistantResponse: "Welcome! To get personalized astrological guidance, please complete your registration below.",
             timestamp: new Date().toISOString(),
           },
         ])
@@ -228,6 +315,114 @@ export function ChatInterface() {
         </div>
       </div>
 
+      {/* Registration Form */}
+      {showRegistration && (
+        <div className="bg-purple-50 border-t border-purple-200 p-4 shadow-lg">
+          <div className="max-w-2xl mx-auto">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">Complete Your Registration</h3>
+            <form onSubmit={handleRegistrationSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                    Full Name *
+                  </label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="John Doe"
+                    value={registrationData.name}
+                    onChange={(e) =>
+                      setRegistrationData({ ...registrationData, name: e.target.value })
+                    }
+                    required
+                    disabled={registering}
+                    className="w-full border-purple-200 focus:border-purple-500 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="birthDate" className="block text-sm font-medium text-gray-700 mb-2">
+                    Birth Date *
+                  </label>
+                  <Input
+                    id="birthDate"
+                    type="date"
+                    value={registrationData.birthDate}
+                    onChange={(e) =>
+                      setRegistrationData({ ...registrationData, birthDate: e.target.value })
+                    }
+                    required
+                    disabled={registering}
+                    className="w-full border-purple-200 focus:border-purple-500 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="birthTime" className="block text-sm font-medium text-gray-700 mb-2">
+                    Birth Time *
+                  </label>
+                  <Input
+                    id="birthTime"
+                    type="time"
+                    value={registrationData.birthTime}
+                    onChange={(e) =>
+                      setRegistrationData({ ...registrationData, birthTime: e.target.value })
+                    }
+                    required
+                    disabled={registering}
+                    className="w-full border-purple-200 focus:border-purple-500 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="birthLocation" className="block text-sm font-medium text-gray-700 mb-2">
+                    Birth Location *
+                  </label>
+                  <Input
+                    id="birthLocation"
+                    type="text"
+                    placeholder="City, Country"
+                    value={registrationData.birthLocation}
+                    onChange={(e) =>
+                      setRegistrationData({ ...registrationData, birthLocation: e.target.value })
+                    }
+                    required
+                    disabled={registering}
+                    className="w-full border-purple-200 focus:border-purple-500 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  type="submit"
+                  disabled={registering || !registrationData.name || !registrationData.birthDate || !registrationData.birthTime || !registrationData.birthLocation}
+                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+                >
+                  {registering ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Registering...
+                    </>
+                  ) : (
+                    "Complete Registration"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowRegistration(false)}
+                  disabled={registering}
+                  className="border-purple-200"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Input Area */}
       <div className="bg-white border-t border-purple-200 p-4 shadow-lg">
         <form onSubmit={handleSendMessage} className="max-w-2xl mx-auto flex gap-2">
@@ -236,12 +431,12 @@ export function ChatInterface() {
             placeholder="Ask the cosmos..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            disabled={loading}
+            disabled={loading || showRegistration}
             className="flex-1 border-purple-200 focus:border-purple-500 focus:ring-purple-500"
           />
           <Button
             type="submit"
-            disabled={loading || !input.trim()}
+            disabled={loading || !input.trim() || showRegistration}
             className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white gap-2"
           >
             <Send className="w-4 h-4" />
