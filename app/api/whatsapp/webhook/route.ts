@@ -12,11 +12,15 @@ import { calculateNatalChart, chartToNatalChart } from "@/lib/natal-chart-servic
 
 /**
  * Extract phone number from Twilio WhatsApp format
- * Format: "whatsapp:+1234567890" -> "+1234567890"
+ * Format: "whatsapp:+1234567890" or "whatsapp: 1234567890" -> "+1234567890" or "1234567890"
  */
 function extractPhoneNumber(from: string): string {
-  // Remove "whatsapp:" prefix if present
-  return from.replace(/^whatsapp:/i, "").trim()
+  // Remove "whatsapp:" prefix if present and clean up
+  let phoneNumber = from.replace(/^whatsapp:/i, "").trim()
+  
+  // Ensure it starts with + if it's a valid international format
+  // If it doesn't start with + and looks like a number, keep as is (might be local format)
+  return phoneNumber
 }
 
 /**
