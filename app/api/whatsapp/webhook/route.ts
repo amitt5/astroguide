@@ -111,6 +111,12 @@ export async function POST(request: NextRequest) {
 
         // Calculate and save natal chart
         try {
+          console.log(`[WhatsApp] Calculating natal chart for user ${user.id}`, {
+            birthDate: registrationData.birthDate,
+            birthTime: registrationData.birthTime,
+            birthLocation: registrationData.birthLocation,
+          })
+          
           const calculatedChart = await calculateNatalChart({
             birthDate: registrationData.birthDate!,
             birthTime: registrationData.birthTime!,
@@ -118,12 +124,26 @@ export async function POST(request: NextRequest) {
           })
 
           if (calculatedChart) {
-            const natalChartData = chartToNatalChart(user.id, calculatedChart)
-            await db.createNatalChart(natalChartData)
-            console.log(`[WhatsApp] Natal chart calculated for user ${user.id}`)
+            try {
+              const natalChartData = chartToNatalChart(user.id, calculatedChart)
+              await db.createNatalChart(natalChartData)
+              console.log(`[WhatsApp] Natal chart calculated and saved for user ${user.id}`)
+            } catch (dbError) {
+              console.error(`[WhatsApp] Error saving natal chart for user ${user.id}:`, dbError)
+              if (dbError instanceof Error) {
+                console.error("[WhatsApp] Database error details:", dbError.message)
+              }
+            }
+          } else {
+            console.warn(`[WhatsApp] Could not calculate natal chart for user ${user.id} - calculateNatalChart returned null`)
           }
         } catch (chartError) {
+          // Don't fail registration if chart calculation fails
           console.error("[WhatsApp] Error calculating natal chart:", chartError)
+          if (chartError instanceof Error) {
+            console.error("[WhatsApp] Error details:", chartError.message)
+            console.error("[WhatsApp] Error stack:", chartError.stack)
+          }
         }
 
         const successMessage =
