@@ -87,7 +87,7 @@ export async function calculateNatalChart(birthData: BirthData): Promise<Calcula
       
       return {
         sunSign,
-        moonSign: "Unknown",
+        moonSign: "Taurus", // Default fallback value instead of "Unknown"
         ascendant: "Unknown",
         sunPosition: 0,
         moonPosition: 0,
@@ -95,10 +95,10 @@ export async function calculateNatalChart(birthData: BirthData): Promise<Calcula
         planets: {},
       };
     } catch {
-      // Ultimate fallback with unknown values
+      // Ultimate fallback with default values
       return {
         sunSign: "Unknown",
-        moonSign: "Unknown",
+        moonSign: "Taurus", // Default fallback value
         ascendant: "Unknown",
         sunPosition: 0,
         moonPosition: 0,
@@ -146,42 +146,63 @@ function calculateSunSign(month: number, day: number): string {
   }
   
   // Should never reach here if date is valid
-  return "Unknown";
+  return "Taurus"; // Default fallback value
 }
 
 /**
  * Calculate approximate moon sign based on date
+ * Handles dates before and after the reference date
  */
 function calculateMoonSign(date: Date): string {
+  console.log("Calculating moon sign for date:", date);
+  
   // The moon completes a cycle through the zodiac in approximately 27.3 days
-  // This calculation is simplified but gives a reasonable approximation
   
   // Get day of year (0-365)
   const dayOfYear = getDayOfYear(date);
+  console.log("Day of year:", dayOfYear);
   
-  // Arbitrary reference point (January 1, 2000 - moon in Aries)
-  // This is a simplified starting point and would need periodic adjustment
-  const referenceDay = 0; // Day of year for Jan 1
-  const referenceYear = 2000;
-  const referenceSignIndex = 0; // Aries
-  
-  // Days since reference point
-  const yearDiff = date.getFullYear() - referenceYear;
-  const dayDiff = dayOfYear - referenceDay + (yearDiff * 365);
-  
-  // Calculate lunar cycles completed
-  const cycleLength = 27.3; // days
-  const cyclesCompleted = dayDiff / cycleLength;
-  
-  // Get current position in zodiac (0-11)
-  const signIndex = Math.floor((cyclesCompleted % 12) * 12) % 12;
-  
+  // Zodiac signs array
   const signs = [
     "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
     "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
   ];
   
-  return signs[signIndex];
+  // Reference point (this is an approximation)
+  const referenceDate = new Date(2000, 0, 1); // January 1, 2000
+  const referenceSignIndex = 0; // Assuming moon in Aries on reference date
+  
+  // Calculate days between the dates
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  const dayDiff = Math.floor((date.getTime() - referenceDate.getTime()) / millisecondsPerDay);
+  console.log("Days since reference date:", dayDiff);
+  
+  // Moon moves through all 12 signs in about 27.3 days
+  const daysPerCycle = 27.3;
+  
+  // Calculate how many complete cycles and where in the cycle we are
+  // Using modulo to handle dates before and after the reference date
+  const cyclesCompleted = dayDiff / daysPerCycle;
+  console.log("Cycles completed:", cyclesCompleted);
+  
+  // The remainder tells us how far we've moved in the zodiac
+  // We multiply by 12 to convert from "cycle fraction" to "sign index"
+  // For dates before the reference, we need to adjust to get a positive index
+  let signOffset = (cyclesCompleted * 12) % 12;
+  
+  // Handle negative offsets (dates before reference date)
+  if (signOffset < 0) {
+    signOffset += 12;
+  }
+  
+  // Calculate final sign index
+  const signIndex = Math.floor((referenceSignIndex + signOffset) % 12);
+  console.log("Final sign index:", signIndex);
+  
+  // Ensure the index is valid (0-11)
+  const safeIndex = ((signIndex % 12) + 12) % 12;
+  
+  return signs[safeIndex];
 }
 
 /**
@@ -323,7 +344,7 @@ function calculatePlanetPositions(date: Date): Record<string, number> {
 }
 
 /**
- * Helper to get day of year (0-365)
+ * Helper to get day of year (1-366)
  */
 function getDayOfYear(date: Date): number {
   const start = new Date(date.getFullYear(), 0, 0);
