@@ -1,18 +1,39 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { db, getHardcodedUser } from "@/lib/db"
+import { db } from "@/lib/db"
 import { generateAstrologicalResponse } from "@/lib/astrological-engine"
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { message, source = "web" } = body
+    const { message, phoneNumber, source = "web" } = body
 
     if (!message || !message.trim()) {
-      return NextResponse.json({ error: "Message is required" }, { status: 400 })
+      return NextResponse.json({ error: "Message is required", success: false }, { status: 400 })
     }
 
-    // Use hardcoded user for MVP
-    const user = getHardcodedUser()
+    if (!phoneNumber || !phoneNumber.trim()) {
+      return NextResponse.json(
+        { error: "Phone number is required to identify user", success: false },
+        { status: 400 },
+      )
+    }
+
+    // Identify user by phone number
+    const user = await db.getUserByWhatsApp(phoneNumber.trim())
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          error:
+            "User not found. Please ensure you have registered with this phone number. If this is your first time, please provide your birth details to create an account.",
+          success: false,
+        },
+        { status: 404 },
+      )
+    }
+
+    // Get user's natal chart (if available)
+    const natalChart = await db.getNatalChartByUser(user.id)
 
     // Determine message type
     let messageType: "question" | "horoscope" | "guidance" = "question"
@@ -23,11 +44,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate astrological response
+    // Use natal chart data if available, otherwise use basic zodiac sign
     const astrologicalResponse = await generateAstrologicalResponse(
       {
         sunSign: user.zodiacSign,
-        moonSign: "Scorpio",
-        ascendant: "Virgo",
+        moonSign: natalChart?.moonSign || "Unknown",
+        ascendant: natalChart?.ascendant || "Unknown",
       },
       message,
     )
@@ -48,7 +70,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("[v0] Messages API error:", error)
-    return NextResponse.json({ error: "Failed to process message" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to process message", success: false }, { status: 500 })
   }
 }
 

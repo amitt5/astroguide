@@ -15,10 +15,21 @@ interface Message {
 }
 
 export function ChatInterface() {
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const [phoneSubmitted, setPhoneSubmitted] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Load phone number from localStorage on mount
+  useEffect(() => {
+    const storedPhone = localStorage.getItem("astroguide_phone")
+    if (storedPhone) {
+      setPhoneNumber(storedPhone)
+      setPhoneSubmitted(true)
+    }
+  }, [])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -28,10 +39,19 @@ export function ChatInterface() {
     scrollToBottom()
   }, [messages])
 
+  const handlePhoneSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (phoneNumber.trim()) {
+      // Store phone number in localStorage
+      localStorage.setItem("astroguide_phone", phoneNumber.trim())
+      setPhoneSubmitted(true)
+    }
+  }
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!input.trim()) return
+    if (!input.trim() || !phoneNumber.trim()) return
 
     setLoading(true)
     const userMessage = input
@@ -43,6 +63,7 @@ export function ChatInterface() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: userMessage,
+          phoneNumber: phoneNumber.trim(),
           source: "web",
         }),
       })
@@ -59,21 +80,102 @@ export function ChatInterface() {
             timestamp: new Date().toISOString(),
           },
         ])
+      } else {
+        // Handle error response
+        setMessages([
+          ...messages,
+          {
+            id: `error-${Date.now()}`,
+            userMessage: userMessage,
+            assistantResponse: data.error || "Sorry, I couldn't process your message. Please try again.",
+            timestamp: new Date().toISOString(),
+          },
+        ])
       }
     } catch (error) {
       console.error("[v0] Error sending message:", error)
+      setMessages([
+        ...messages,
+        {
+          id: `error-${Date.now()}`,
+          userMessage: userMessage,
+          assistantResponse: "Sorry, there was an error processing your message. Please try again.",
+          timestamp: new Date().toISOString(),
+        },
+      ])
     } finally {
       setLoading(false)
     }
+  }
+
+  // Phone number input screen
+  if (!phoneSubmitted) {
+    return (
+      <div className="flex flex-col h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 shadow-lg">
+          <div className="max-w-2xl mx-auto">
+            <h1 className="text-3xl font-bold">AstroGuide</h1>
+            <p className="text-purple-100 text-sm mt-1">Cosmic wisdom at your fingertips</p>
+          </div>
+        </div>
+
+        {/* Phone Number Input */}
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="max-w-md w-full space-y-6">
+            <div className="text-center space-y-4">
+              <div className="text-6xl">✨</div>
+              <h2 className="text-2xl font-bold text-gray-700">Welcome to AstroGuide</h2>
+              <p className="text-gray-600">
+                To get started, please enter your phone number. This helps us identify you and provide personalized
+                astrological guidance.
+              </p>
+            </div>
+
+            <form onSubmit={handlePhoneSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number
+                </label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="+1234567890"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  required
+                  className="w-full border-purple-200 focus:border-purple-500 focus:ring-purple-500"
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  Format: Include country code (e.g., +1234567890 or +919876543210)
+                </p>
+              </div>
+              <Button
+                type="submit"
+                disabled={!phoneNumber.trim()}
+                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+              >
+                Continue
+              </Button>
+            </form>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 shadow-lg">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-3xl font-bold">AstroGuide</h1>
-          <p className="text-purple-100 text-sm mt-1">Cosmic wisdom at your fingertips</p>
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">AstroGuide</h1>
+            <p className="text-purple-100 text-sm mt-1">Cosmic wisdom at your fingertips</p>
+          </div>
+          <div className="text-sm text-purple-200">
+            {phoneNumber}
+          </div>
         </div>
       </div>
 
