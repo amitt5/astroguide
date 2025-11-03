@@ -134,59 +134,100 @@ Keep confidence scores realistic. If intent is unclear, set requiresClarificatio
 }
 
 /**
- * Generates an astrological response using OpenAI
+ * Generates a conversational, personalized astrological response using OpenAI
  */
 export async function generateAstrologicalResponse(
   context: AstrologicalContext,
   userQuestion: string,
   intent?: UserIntent,
+  userName?: string, // Added parameter for user's name
+  previousInteractions?: number, // Added parameter to track relationship history
 ): Promise<string> {
   try {
     const intentContext = intent
       ? `Intent: ${intent.replace("_", " ")}`
       : "Intent: General guidance"
+    
+    // Simplify available chart info for easier reference
+    const chartInfo = {
+      sun: context.sunSign ? `${context.sunSign} (${signElements[context.sunSign] || "Unknown"} element)` : "Unknown",
+      moon: context.moonSign !== "Unknown" ? `${context.moonSign} (${signElements[context.moonSign] || "Unknown"} element)` : "Unknown",
+      ascendant: context.ascendant !== "Unknown" ? `${context.ascendant} (${signElements[context.ascendant] || "Unknown"} element)` : "Unknown",
+    }
+    
+    // Identify current astrological timing
+    const currentDate = new Date()
+    const month = currentDate.getMonth() + 1
+    const day = currentDate.getDate()
+    
+    // Simplified astrological timing reference
+    let currentTiming = "We're currently in "
+    // Simple season calculation
+    if ((month === 3 && day >= 20) || (month > 3 && month < 6) || (month === 6 && day < 21)) {
+      currentTiming += "spring, a time of new beginnings and growth."
+    } else if ((month === 6 && day >= 21) || (month > 6 && month < 9) || (month === 9 && day < 22)) {
+      currentTiming += "summer, a time of action and expression."
+    } else if ((month === 9 && day >= 22) || (month > 9 && month < 12) || (month === 12 && day < 21)) {
+      currentTiming += "autumn, a time of reflection and balance."
+    } else {
+      currentTiming += "winter, a time of introspection and planning."
+    }
 
-    const prompt = `You are an expert astrological counselor with deep knowledge of natal charts, planetary transits, and astrological wisdom. Provide insightful, personalized astrological guidance based on the user's birth chart and question.
+    const prompt = `You're a friendly, experienced astrologer chatting with ${userName || "someone"} on WhatsApp. This is ${previousInteractions && previousInteractions > 3 ? "someone you've been working with for a while" : "a newer connection"}. Keep things conversational and authentic.
 
-User's Birth Chart:
-- Sun Sign: ${context.sunSign} (${signCharacteristics[context.sunSign] || "mysterious"})
-- Moon Sign: ${context.moonSign} (${context.moonSign !== "Unknown" ? signCharacteristics[context.moonSign] || "mysterious" : "not yet calculated"})
-- Ascendant: ${context.ascendant} (${context.ascendant !== "Unknown" ? signCharacteristics[context.ascendant] || "mysterious" : "not yet calculated"})
+IMPORTANT: Your goal is to sound like a real person texting, not a formal astrology textbook or AI. Use contractions, casual language, and a warm, personal tone throughout.
 
-Sun Sign Element: ${signElements[context.sunSign] || "Unknown"}
-${context.moonSign !== "Unknown" ? `Moon Sign Element: ${signElements[context.moonSign] || "Unknown"}` : ""}
-${context.ascendant !== "Unknown" ? `Ascendant Element: ${signElements[context.ascendant] || "Unknown"}` : ""}
+THEIR CHART BASICS:
+Sun: ${chartInfo.sun}
+Moon: ${chartInfo.moon} 
+Rising: ${chartInfo.ascendant}
+${context.birthDate ? `Born: ${context.birthDate}` : ""}
+${context.birthLocation ? `Location: ${context.birthLocation}` : ""}
 
-${context.birthDate ? `Birth Date: ${context.birthDate}` : ""}
-${context.birthTime ? `Birth Time: ${context.birthTime}` : ""}
-${context.birthLocation ? `Birth Location: ${context.birthLocation}` : ""}
-
-User's Question: "${userQuestion}"
+THEIR QUESTION: "${userQuestion}"
 ${intentContext}
 
-Provide a thoughtful, compassionate astrological response that:
-1. Acknowledges their question with empathy
-2. Relates it to their birth chart and astrological influences
-3. Offers actionable insights and guidance
-4. Includes relevant planetary or astrological considerations when appropriate
-5. Maintains a supportive, encouraging tone
+CURRENT TIMING: ${currentTiming}
 
-Keep your response concise (2-4 paragraphs), conversational, and authentic. Sound like a wise, experienced astrologer who genuinely cares about helping the user. Avoid generic statements - be specific to their chart and question.`
+HOW TO RESPOND:
+1. Start with a casual, personal greeting using their name if available
+2. Keep your total response BRIEF (1-2 short paragraphs max) - this is WhatsApp!
+3. Make ONE specific observation about their chart that relates to their question
+4. Offer ONE practical insight or suggestion they can actually use
+5. Add a touch of your personality (a light joke, personal anecdote, or question for them)
+6. Use natural language patterns with contractions (I'm, you're, doesn't, etc.)
+
+DON'Ts:
+- Don't use "Dear Seeker" or any formal salutations
+- Don't overload with astrological jargon - limit to 1-2 key astrological terms maximum
+- Don't give a generic response that could apply to anyone
+- Don't end with spiritual platitudes or formal sign-offs
+- Don't write more than 150 words total
+
+TONE GUIDE:
+- Sound like a knowledgeable friend texting, not delivering a sermon
+- Be conversational, warm, and occasionally use emojis if appropriate
+- Vary sentence length and structure for natural rhythm
+- Show your personality and humanity
+
+Remember: People want quick, accessible insights they can apply to their lives. Make them feel understood, not lectured.`
 
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: "You are an expert astrological counselor. Provide insightful, personalized, and compassionate astrological guidance.",
+          content: "You're a personable astrologer having a casual WhatsApp conversation. You're knowledgeable but talk like a real person - warm, concise, and authentic.",
         },
         {
           role: "user",
           content: prompt,
         },
       ],
-      temperature: 0.8,
-      max_tokens: 500,
+      temperature: 0.85, // Slightly higher for more natural variation
+      max_tokens: 250, // Reduced to enforce brevity
+      presence_penalty: 0.6, // Encourages more novel language
+      frequency_penalty: 0.5, // Discourages repetitive patterns
     })
 
     const content = response.choices[0]?.message?.content
@@ -197,12 +238,10 @@ Keep your response concise (2-4 paragraphs), conversational, and authentic. Soun
     return content.trim()
   } catch (error) {
     console.error("[OpenAI] Error generating astrological response:", error)
-    // Fallback response
-    const sunSignTraits = signCharacteristics[context.sunSign] || "mysterious"
-    return `Based on your ${context.sunSign} Sun sign (${sunSignTraits}), I sense your question about "${userQuestion}" requires deeper contemplation. Your ${context.moonSign !== "Unknown" ? `${context.moonSign} Moon` : "intuitive nature"} brings emotional depth to this matter. Trust your inner wisdom and let the cosmic energies guide you. Your ${context.ascendant !== "Unknown" ? `${context.ascendant} Ascendant` : "authentic self"} brings a unique perspective to this situation.`
+    // Improved fallback response - more conversational
+    return `Hey there! Looking at your ${context.sunSign} energy, I can see why you're asking about "${userQuestion.substring(0, 30)}...". Trust your gut on this one - your ${context.moonSign !== "Unknown" ? context.moonSign : "emotional"} side already knows what to do. Let me know if you want to dig deeper into this!`
   }
 }
-
 /**
  * Generates daily horoscope using OpenAI
  */
